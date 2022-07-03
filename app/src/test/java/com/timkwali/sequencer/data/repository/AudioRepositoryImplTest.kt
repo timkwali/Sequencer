@@ -13,7 +13,7 @@ class AudioRepositoryImplTest {
 
     @Before
     fun setUp() {
-        val list = listOf(1, 2, 3, 4)
+        val list = listOf(1, 2, 3)
         every { audioData.audioListA } returns list
         every { audioData.imageListA } returns list
         every { audioData.audioListB } returns list
