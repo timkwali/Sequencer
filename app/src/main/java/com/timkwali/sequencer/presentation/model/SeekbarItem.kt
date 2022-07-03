@@ -1,4 +1,4 @@
-package com.timkwali.sequencer.util
+package com.timkwali.sequencer.presentation.model
 
 data class SeekbarItem(
     val progress: Int = 0,

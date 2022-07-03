@@ -1,19 +1,22 @@
 package com.timkwali.sequencer.presentation
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.timkwali.sequencer.R
 import com.timkwali.sequencer.databinding.ActivityMainBinding
 import com.timkwali.sequencer.util.AudioTrack
+import com.timkwali.sequencer.util.Utils.blink
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
+
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    lateinit var binding: ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
     private val mainViewModel : MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,8 +29,14 @@ class MainActivity : AppCompatActivity() {
                 mainViewModel.isPlaying.collectLatest {
                     if(it) {
                         playBtn.setImageResource(R.drawable.ic_pause)
+                        loopBtn.isEnabled = true
+                        loopBtn.setImageResource(R.drawable.ic__loop)
+                        microLoopIndicator.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.black))
                     } else {
                         playBtn.setImageResource(R.drawable.ic_play)
+                        loopBtn.isEnabled = false
+                        loopBtn.setImageResource(R.drawable.ic_loop_grey)
+                        microLoopIndicator.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.grey))
                     }
                 }
             }
@@ -71,21 +80,48 @@ class MainActivity : AppCompatActivity() {
                     trackProgressB.max = it.duration
                 }
             }
-
+            lifecycleScope.launchWhenStarted {
+                mainViewModel.mtiData.collectLatest {
+                    mti.text = it
+                }
+            }
+            lifecycleScope.launchWhenStarted {
+                mainViewModel.beatData.collectLatest {
+                    if(it.isBeat) beatLed.blink()
+                    if(it.isBar) barLed.blink()
+                }
+            }
+            lifecycleScope.launchWhenStarted {
+                mainViewModel.isMicroLoopOn.collectLatest {
+                    if(it) {
+                        microLoopIndicator.text = getString(R.string.on)
+                    } else {
+                        microLoopIndicator.text = getString(R.string.off)
+                    }
+                }
+            }
 
             playBtn.setOnClickListener {
                 mainViewModel.onPlayClick()
-                mainViewModel.setUpSeekbar(AudioTrack.A)
-                mainViewModel.setUpSeekbar(AudioTrack.B)
+                mainViewModel.updateUiData()
+                mainViewModel.setUpBeats()
             }
-
+            playBtn.setOnLongClickListener {
+                if(mainViewModel.isPlaying.value) {
+                    mainViewModel.reset()
+                    playBtn.setImageResource(R.drawable.ic_play)
+                }
+                true
+            }
             nextTrackBtnA.setOnClickListener {
                 mainViewModel.nextAudio(AudioTrack.A)
             }
             nextTrackBtnB.setOnClickListener {
                 mainViewModel.nextAudio(AudioTrack.B)
             }
-
+            loopBtn.setOnClickListener {
+                mainViewModel.switchMicroLoop()
+            }
         }
     }
 

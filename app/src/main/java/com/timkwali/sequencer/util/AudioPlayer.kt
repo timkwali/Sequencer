@@ -13,28 +13,24 @@ class AudioPlayer(
     var isPlaying = false
 
     fun setUpMediaPlayer(audio: Int) {
-//        if(mediaPlayer == null) {
-            mediaPlayer = MediaPlayer.create(context, audio)
-            mediaPlayer?.isLooping = false
-            mediaPlayer?.setOnCompletionListener {
-                completeCallback()
-            }
-            Log.d("mainViewModel", "id: ${mediaPlayer!!.audioSessionId}")
-//            initialiseSeekbar()
-//        }
-    }
-
-    fun playPauseAudio() {
-        if(mediaPlayer?.isPlaying == true) {
-            mediaPlayer?.pause()
-            isPlaying = false
-        } else {
-            mediaPlayer?.start()
-            isPlaying = true
+        mediaPlayer = MediaPlayer.create(context, audio)
+        mediaPlayer?.isLooping = false
+        mediaPlayer?.setOnCompletionListener {
+            completeCallback()
         }
     }
 
-    private fun stop() {
+    fun playPauseAudio() {
+        isPlaying = if(mediaPlayer?.isPlaying == true) {
+            mediaPlayer?.pause()
+            false
+        } else {
+            mediaPlayer?.start()
+            true
+        }
+    }
+
+    fun stop() {
         if(mediaPlayer != null) {
             mediaPlayer?.apply {
                 stop()
@@ -42,6 +38,7 @@ class AudioPlayer(
                 release()
                 mediaPlayer = null
             }
+            isPlaying = false
         }
     }
 }

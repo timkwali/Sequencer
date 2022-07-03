@@ -1,4 +1,4 @@
-package com.timkwali.sequencer.data
+package com.timkwali.sequencer.data.local
 
 import com.timkwali.sequencer.R
 import javax.inject.Inject

@@ -3,4 +3,6 @@
     <string name="_bar">Bar</string>
     <string name="_beat">Beat</string>
     <string name="_0_0_0">0:0:0</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
 </resources>

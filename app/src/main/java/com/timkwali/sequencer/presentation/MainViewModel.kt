@@ -5,21 +5,24 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.timkwali.sequencer.domain.model.AudioItem
 import com.timkwali.sequencer.domain.usecase.GetAudioData
-import com.timkwali.sequencer.util.AudioPlayer
-import com.timkwali.sequencer.util.AudioTrack
-import com.timkwali.sequencer.util.SeekbarItem
+import com.timkwali.sequencer.presentation.model.BeatData
+import com.timkwali.sequencer.presentation.model.SeekbarItem
+import com.timkwali.sequencer.util.*
+import com.timkwali.sequencer.util.Constants.BPM
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.lang.Exception
 import javax.inject.Inject
 
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val app: Application,
-    private val getAudioData: GetAudioData
+    app: Application,
+    private val getAudioData: GetAudioData,
+    private val mtiCalculator: MTICalculator
 ): AndroidViewModel(app) {
 
     private var audioPlayerA: AudioPlayer? = null
@@ -44,6 +47,23 @@ class MainViewModel @Inject constructor(
     var seekbarItem: MutableStateFlow<SeekbarItem> = MutableStateFlow(SeekbarItem())
         private set
 
+    var mtiData = MutableStateFlow("0:0:0")
+        private set
+
+    var beatData: MutableStateFlow<BeatData> = MutableStateFlow(BeatData())
+        private set
+
+    var isMicroLoopOn: MutableStateFlow<Boolean> = MutableStateFlow(false)
+        private set
+
+    private var currentTime = 0
+    private var beatTime = 0
+
+    private var playbackTimeMillis: MutableStateFlow<Int> = MutableStateFlow(0)
+        private set
+
+    private var playbackJob: Job? = null
+
     init {
         getAudioItems()
         audioPlayerA = AudioPlayer(app.applicationContext) {
@@ -56,7 +76,10 @@ class MainViewModel @Inject constructor(
                 audioCompleteCallback(AudioTrack.B, it)
             }
         }
+        initAudioPlayer()
+    }
 
+    private fun initAudioPlayer() {
         val audioA = currentAudioItemA.value?.audioResource
         val audioB = currentAudioItemB.value?.audioResource
         if (audioA != null && audioB != null) {
@@ -80,16 +103,23 @@ class MainViewModel @Inject constructor(
     }
 
     private fun audioCompleteCallback(audioTrack: AudioTrack, audioPlayer: AudioPlayer) {
+        when(audioTrack) {
+            AudioTrack.A -> {
+                isNextEnabledA.value = true
+                audioPlayerA?.mediaPlayer?.release()
+            }
+            AudioTrack.B -> {
+                isNextEnabledB.value = true
+                audioPlayerB?.mediaPlayer?.release()
+            }
+        }
         val audio = getAudioFile(audioTrack)
         if(audio != null) {
             audioPlayer.setUpMediaPlayer(audio)
             audioPlayer.playPauseAudio()
             isPlaying.value = audioPlayerA?.isPlaying == true
-            when(audioTrack) {
-                AudioTrack.A -> isNextEnabledA.value = true
-                AudioTrack.B -> isNextEnabledB.value = true
-            }
-            setUpSeekbar(audioTrack)
+            updateUiData()
+            setUpBeats()
         }
     }
 
@@ -97,21 +127,36 @@ class MainViewModel @Inject constructor(
         audioPlayerA?.playPauseAudio()
         audioPlayerB?.playPauseAudio()
         isPlaying.value = audioPlayerA?.isPlaying == true
+        if(isMicroLoopOn.value) {
+            switchMicroLoop()
+        }
     }
 
-    fun setUpSeekbar(audioTrack: AudioTrack) {
+    fun updateUiData() {
         viewModelScope.launch {
-            val mp = when(audioTrack) {
-                AudioTrack.A -> audioPlayerA?.mediaPlayer
-                AudioTrack.B -> audioPlayerB?.mediaPlayer
+            while (isPlaying.value) {
+                seekbarItem.value = SeekbarItem(
+                    audioPlayerA?.mediaPlayer!!.currentPosition,
+                    audioPlayerA?.mediaPlayer!!.duration
+                )
+                playbackTimeMillis.value = audioPlayerA?.mediaPlayer!!.currentPosition
+                currentTime++
+                mtiCalculator.second = currentTime
+                mtiData.value = mtiCalculator.getMTI()
+                delay(1)
             }
-            try {
-                while (isPlaying.value) {
-                    seekbarItem.value = SeekbarItem(mp!!.currentPosition, mp.duration)
-                    delay(1)
-                }
-            } catch (e: Exception) {
-                seekbarItem.value = SeekbarItem(0, 0)
+        }
+    }
+
+    fun setUpBeats() {
+        viewModelScope.launch {
+            while (isPlaying.value) {
+                beatTime++
+                beatData.value = BeatData(
+                    mtiCalculator.isBeat(beatTime),
+                    mtiCalculator.isBar(beatTime)
+                )
+                delay((60000/BPM)/2.toLong())
             }
         }
     }
@@ -133,6 +178,44 @@ class MainViewModel @Inject constructor(
                     nextAudioIndexB++
                 }
                 isNextEnabledB.value = false
+            }
+        }
+    }
+
+    fun reset() {
+        if(isPlaying.value) {
+            audioPlayerA?.stop()
+            audioPlayerB?.stop()
+            isPlaying.value = audioPlayerA?.isPlaying == true
+            isMicroLoopOn.value = !isMicroLoopOn.value
+            currentTime = 0
+            beatTime = 0
+            mtiData.value = "0:0:0"
+            seekbarItem.value = SeekbarItem()
+            initAudioPlayer()
+        }
+    }
+
+    fun switchMicroLoop() {
+        if(isPlaying.value) {
+            isMicroLoopOn.value = !isMicroLoopOn.value
+        }
+        if(isMicroLoopOn.value) {
+            val startTime = mtiCalculator.getLoopStartTime()
+            val endTime = mtiCalculator.getLoopEndTime()
+            startMicroLoop(startTime, endTime)
+        } else {
+            playbackJob?.cancel()
+        }
+    }
+
+    private fun startMicroLoop(startTime: Int, endTime: Int) {
+        playbackJob = viewModelScope.launch {
+            playbackTimeMillis.collectLatest {
+                if(isMicroLoopOn.value && playbackTimeMillis.value >= endTime) {
+                    audioPlayerA?.mediaPlayer?.seekTo(startTime)
+                    audioPlayerB?.mediaPlayer?.seekTo(startTime)
+                }
             }
         }
     }

@@ -6,6 +6,9 @@
         <entry key="app/src/main/res/drawable-v24/empty_blink.xml" value="0.258" />
         <entry key="app/src/main/res/drawable-v24/ic_forward.xml" value="0.258" />
         <entry key="app/src/main/res/drawable-v24/progress_drawable.xml" value="0.258" />
+        <entry key="app/src/main/res/drawable/ic__loop.xml" value="0.226" />
+        <entry key="app/src/main/res/drawable/ic_loop_grey.xml" value="0.226" />
+        <entry key="app/src/main/res/drawable/light_blink.xml" value="0.268" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.335" />
       </map>
     </option>
